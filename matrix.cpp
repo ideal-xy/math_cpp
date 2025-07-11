@@ -181,6 +181,15 @@ public:
         return Rank;
     }
 
+    void transpose(Matrix& B,int blocksize)
+    {
+        for (int i=0;i<m_rows;i+=blocksize)
+            for (int j=0;j<m_cols;j+=blocksize)
+                for (int ii=i;ii<((i+blocksize > m_rows) ? m_rows : (i+blocksize));++ii)
+                    for (int jj=j;jj<((j+blocksize)>m_cols) ? m_cols : (j+blocksize);++jj)
+                        B.m_mat[jj][ii] = m_mat[ii][ii];
+    }
+
     double getValue(int r,int c) // 得到mat(r,c)
     {
         return m_mat[r][c];
