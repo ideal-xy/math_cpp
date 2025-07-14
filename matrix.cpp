@@ -220,6 +220,14 @@ public:
         m_mat = data;
     }
 
+    double& operator()(int i,int j)
+    {
+        if(i<1 || i>m_rows || j<1 || j>m_cols)
+            throw std::invalid_argument("dismatched dimensions,sorry🥹");
+
+        return m_mat[i-1][j-1];
+    }
+
     friend std::istream& operator>> (std::istream& in, Matrix& mat);
     friend std::ostream& operator<< (std::ostream& out,Matrix& mat);
 };
