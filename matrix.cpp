@@ -19,7 +19,7 @@ private:
     size_t m_cols;
 
 public:
-    Matrix(int rows,int cols) : m_rows{rows},m_cols{cols}, m_mat{rows,std::vector<double>(cols,0)}  {} // 构造函数，默认全部是0
+    Matrix(size_t rows,size_t cols) : m_mat{rows,std::vector<double>(cols,0)},m_rows{rows},m_cols{cols}  {} // 构造函数，默认全部是0
 
     // Matrix(Matrix& mat)
     // {
@@ -44,9 +44,9 @@ public:
             {
                 sum_mat.m_mat[r][c] = m_mat[r][c] + mat.m_mat[r][c];
             }
-            return sum_mat;
         }
 
+        return sum_mat;
     }
 
     Matrix operator-(const Matrix& mat)
@@ -60,8 +60,8 @@ public:
             {
                 re_mat.m_mat[r][c] = m_mat[r][c] - mat.m_mat[r][c];
             }
-            return re_mat;
         }
+        return re_mat;
 
     }
 
@@ -160,7 +160,7 @@ public:
     Matrix subMatrix(size_t start_row,size_t end_row,size_t start_col,size_t end_col ) const //子矩阵确定方法是两条横线，两条竖线交叉产生一个矩阵
     {
         Matrix subMatrix(end_row-start_row,end_col-start_col);
-        for (int i = start_row;i<end_col+1;++i)
+        for (size_t i = start_row;i<end_col+1;++i)
         {
             std::copy(m_mat[i].begin()+start_col,m_mat[i].begin()+end_col,subMatrix.m_mat[i-start_row].begin());
         }
@@ -269,7 +269,7 @@ public:
         }
 
         Matrix reduced = upper;
-        for (int col = n-1;col >= 0;--col) // 从最后一列开始 把增广矩阵的右半部分变为单位矩阵
+        for (size_t col = n-1;col >= 0;--col) // 从最后一列开始 把增广矩阵的右半部分变为单位矩阵
         {
             double pivot = reduced.m_mat[col][col]; // 定位左边矩阵的主对角线上的元素
             for (size_t j=col;j<2*n;++j) // 主循环，一列一列处理，我们的思路是把主对角线上方的每一个元素都变为0
@@ -295,10 +295,9 @@ public:
                     inverseMat.m_mat[i][j] = reduced.m_mat[i][j+n];
                 }
             }
-            return inverseMat;
         }
-        
 
+        return inverseMat;
 
     }
     
@@ -320,7 +319,7 @@ public:
     {
         Matrix temp = ((*this).gaussElimination()).second;
         int Rank{1};
-        for (int i=0;i<m_rows;++i)
+        for (size_t i=0;i<m_rows;++i)
         {
             if (std::all_of(temp.m_mat[i].begin(),temp.m_mat[i].end(),[](int x) { return std::abs(x) <1e-10; }))
             { Rank++;}
@@ -345,9 +344,9 @@ public:
                 int i_end = std::min(i + blocksize, static_cast<int>(m_rows));
                 int j_end = std::min(j + blocksize,static_cast<int>(m_cols));
 
-                for (int ii=i;i<i_end;++i)
+                for (size_t ii=i;i<i_end;++i)
                 {
-                    for (int jj=j;jj<j_end;++j)
+                    for (size_t jj=j;jj<j_end;++j)
                     {
                         transposed.m_mat[jj][ii] = m_mat[ii][jj];
                     }
@@ -364,9 +363,9 @@ public:
             throw std::invalid_argument("INVALID PARAMATERS");
         }
 
-        for (int i=0;i<m_rows;++i)
+        for (size_t i=0;i<m_rows;++i)
         {
-            for (int j=i+1;j<m_cols;++j)
+            for (size_t j=i+1;j<m_cols;++j)
             {
                 std::swap(m_mat[i][j],m_mat[j][i]);
             }
@@ -394,12 +393,12 @@ public:
         return total;
     }
 
-    double getValue(int r,int c) const // 得到mat(r,c)
+    double getValue(size_t r,size_t c) const // 得到mat(r,c)
     {
         return m_mat[r][c];
     }
     
-    void setValue(int r,int c,double element)
+    void setValue(size_t r,size_t c,double element)
     {
         m_mat[r][c] = element;
     }
@@ -437,7 +436,7 @@ public:
         (*this).identical_fill(0.0);
     }
 
-    double& operator()(int i,int j)
+    double& operator()(size_t i,size_t j)
     {
         if(i<1 || i>m_rows || j<1 || j>m_cols)
             throw std::invalid_argument("dismatched dimensions,sorry🥹");
@@ -451,9 +450,9 @@ public:
 
 std::istream& operator>> (std::istream& in, Matrix& mat)
     {
-        for (int i = 0; i < mat.m_rows; ++i) {
+        for (size_t i = 0; i < mat.m_rows; ++i) {
             std::cout << "please input the element of row" << " " << i << '\n';
-            for (int j = 0; j < mat.m_cols; ++j) {
+            for (size_t j = 0; j < mat.m_cols; ++j) {
                 std::cout << "element" << " " << j << ':';
                 in >> mat.m_mat[i][j];
             }
@@ -464,10 +463,10 @@ std::istream& operator>> (std::istream& in, Matrix& mat)
 std::ostream& operator<< (std::ostream& out, Matrix& mat)
 {
     std::cout << "the matrix you input is:" << "\n";
-    for (int i=0;i<mat.m_rows;++i)
+    for (size_t i=0;i<mat.m_rows;++i)
     {
         std::cout << std::left;
-        for (int j=0;j<mat.m_cols;++j)
+        for (size_t j=0;j<mat.m_cols;++j)
         {
             out << std::setw(10) << mat.m_mat[i][j];
         }
