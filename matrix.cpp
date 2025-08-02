@@ -2,13 +2,13 @@
 #include <vector>
 #include <cassert>
 #include <cmath>
-#include <omp.h>
 #include <stdexcept>
 #include <ranges>
 #include <iomanip>
 #include <optional>
 #include <utility>
 #include <algorithm>
+#include <numeric>
 
 
 class Matrix
@@ -19,7 +19,19 @@ private:
     size_t m_cols;
 
 public:
-    Matrix(int rows,int cols) : m_rows{rows},m_cols{cols}, m_mat{rows,std::vector<double>(cols,0)}  {}
+    Matrix(int rows,int cols) : m_rows{rows},m_cols{cols}, m_mat{rows,std::vector<double>(cols,0)}  {} // 构造函数，默认全部是0
+
+    // Matrix(Matrix& mat)
+    // {
+    //     m_mat.resize(mat.m_mat.size());
+    //     int i=0;
+    //     for (auto& row:m_mat)
+    //     {
+    //         row.resize(mat.m_mat[0].size());
+    //         std::copy(row.begin(),row.end(),mat.m_mat[i].begin());
+    //         i++;
+    //     }
+    // }                  // 析构函数
     
     Matrix operator+ (const Matrix& mat) // 加法
     {
@@ -37,9 +49,63 @@ public:
 
     }
 
-    Matrix operator* (const Matrix& mat)
+    Matrix operator-(const Matrix& mat)
     {
-        assert(m_cols = mat.m_rows);
+        assert(m_cols == mat.m_cols || m_rows == mat.m_rows);
+        Matrix re_mat{m_rows,m_cols};
+
+        for (size_t r = 0;r < m_rows;++r )
+        {
+            for (size_t c = 0;c <  m_cols;++c)
+            {
+                re_mat.m_mat[r][c] = m_mat[r][c] - mat.m_mat[r][c];
+            }
+            return re_mat;
+        }
+
+    }
+
+    bool operator==(const Matrix& other) // 比较两个矩阵是否相等
+    {
+        if(m_cols != other.m_cols || m_rows != other.m_rows)
+        {
+            return false;
+        }
+
+        for (size_t i=0;i<m_rows;++i)
+        {
+            if (!std::equal(m_mat[i].begin(),m_mat[i].end(),other.m_mat[i].begin()))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator!=(const Matrix& other)
+    {
+        if(m_cols != other.m_cols || m_rows != other.m_rows)
+        {
+            return true;
+        }
+
+        for (size_t i=0;i<m_rows;++i)
+        {
+            if (!std::equal(m_mat[i].begin(),m_mat[i].end(),other.m_mat[i].begin()))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+ 
+    Matrix operator* (const Matrix& mat) const // 矩阵乘法
+    {
+        if (m_cols != mat.m_rows)
+        {
+            throw std::invalid_argument("INVALID PARAMETERS");
+        }
+
         Matrix mul_mat{m_rows,mat.m_cols};
 
         for (size_t r = 0;r<m_rows;++r)
@@ -53,14 +119,59 @@ public:
             }
             
         }
-        return mat;
+        return mul_mat;
     }
 
-    std::pair<int,Matrix> gaussElimination() const
+    void rowInterchange(size_t i,size_t j)
+    {
+        if(i == j || i > m_rows ||j > m_rows)
+        {
+            throw std::invalid_argument("INVALID PARAMETERS");
+        }
+
+        std::swap(m_mat[i],m_mat[j]);
+    }
+
+    void multiplication_of_row(size_t row,double factor) // 第二类初等变换
+    {
+        if (row>m_rows)
+        {
+            throw std::invalid_argument("INVALID PARAMETERS");
+        }
+
+        for (int j=0;j<m_cols;++j)
+        {
+            m_mat[row][j] *= factor;
+        }
+    }
+
+    void addition_multiplied_row(size_t row1,size_t row2,double factor)  // 第三类初等变换
+    {
+        if (row1>m_rows || row2 > m_rows)
+        {
+            throw std::invalid_argument("INVALID PARAMETERS");
+        }
+
+        std::transform(m_mat[row1].begin(),m_mat[row1].begin(),m_mat[row2].begin(),
+                                                   m_mat[row1].begin(),[factor](double x,double y){return x + factor*y;});
+    }
+    
+
+    Matrix subMatrix(size_t start_row,size_t end_row,size_t start_col,size_t end_col ) const //子矩阵确定方法是两条横线，两条竖线交叉产生一个矩阵
+    {
+        Matrix subMatrix(end_row-start_row,end_col-start_col);
+        for (int i = start_row;i<end_col+1;++i)
+        {
+            std::copy(m_mat[i].begin()+start_col,m_mat[i].begin()+end_col,subMatrix.m_mat[i-start_row].begin());
+        }
+        return subMatrix;
+    }
+
+    std::pair<int,Matrix> gaussElimination() const // 对矩阵进行Gauss消元，返回值中的int times 代表的是进行第三类初等变换的次数，也就是交换两行的次数
     {
         int currentRow = 0;
         int times = 0;
-        Matrix copy = *this;
+        Matrix copy(*this); // 我们不希望影响矩阵本身
         
         for (int c = 0;c < copy.m_cols && currentRow < m_rows;++c) // traverse every column
         {
@@ -107,7 +218,7 @@ public:
         return {times,std::move(copy)};
     }
     
-    double determiant()
+    double determiant() // 计算行列式，这里需要调用Gauss消元的成员函数
     {
         assert(m_cols == m_rows);
         int det = 1;
@@ -122,36 +233,73 @@ public:
         
     }
 
-    bool isInvertible()
+    bool isInvertible() // 判断一个矩阵是否是可逆的
     {
         return (*this).determiant() != 0;
     }
 
-    Matrix& inverse(Matrix& inverseMat)
+    Matrix& inverse(Matrix& inverseMat) const // 
     {
-        Matrix copy = *this;
-        int rows = copy.m_cols;
-        Matrix aug{rows,2*rows};
-
-        for (int i=0;i<rows;++i)
+        if(m_cols != m_rows) // 检查是否为方阵
         {
-            for (int j=0;j<rows;++j)
-            {
-                aug.m_mat[i][j] = copy.m_mat[i][j];
-            }
-            aug.m_mat[i][i+rows] = 0.0;
+            throw std::invalid_argument("Only square matrix has inverse matrix");
         }
 
-        aug = (aug.gaussElimination()).second;
+        size_t n = m_rows;
+        const double epsilon = 1e-9;
 
-        for (int k=0;k<rows;++k)
+        Matrix augmented_mat(n,2*n); // 构造增广矩阵
+        for (size_t i=0;i<n;++i)
         {
-            for (int i = 0;i<rows;++i)
+            for (size_t j=0;j<n;++j)
             {
-                inverseMat.m_mat[k][i] = aug.m_mat[k][i+rows];
+                augmented_mat.m_mat[i][j] = m_mat[i][j];
+            }
+            augmented_mat.m_mat[i][i+n] = 1.0;
+        }
+
+        // 我上面写好的gauss消元函数并不能满足使用增广矩阵求逆的需求
+        Matrix upper = augmented_mat.gaussElimination().second;
+        for (size_t i=0;i<n;++i)
+        {
+            if (std::abs(upper.m_mat[i][i])<epsilon)
+            {
+                throw std::runtime_error("This matrix is not invertible");
             }
         }
-        return inverseMat;
+
+        Matrix reduced = upper;
+        for (int col = n-1;col >= 0;--col) // 从最后一列开始 把增广矩阵的右半部分变为单位矩阵
+        {
+            double pivot = reduced.m_mat[col][col]; // 定位左边矩阵的主对角线上的元素
+            for (size_t j=col;j<2*n;++j) // 主循环，一列一列处理，我们的思路是把主对角线上方的每一个元素都变为0
+            {
+                reduced.m_mat[col][j] /= pivot; // 先把主对角线上的元素都变为1
+            }
+
+            for(size_t row=col-1;row >= 0;--row) // 开始处理主对角线上每个元素上面的所有元素，行索引控制
+            {
+                double factor = reduced.m_mat[row][col]; // 由于该列主对角线元素已经是1
+                for (size_t j = col;j<2*n;++j) // row行其它的元素也要处理
+                {
+                    reduced.m_mat[row][j] -= factor * reduced.m_mat[col][j];
+                }
+            }
+
+            // 提取右边的矩阵
+            inverseMat = Matrix(n,n);
+            for (size_t i =0;i<n;++i)
+            {
+                for (size_t j=0;j<n;++j)
+                {
+                    inverseMat.m_mat[i][j] = reduced.m_mat[i][j+n];
+                }
+            }
+            return inverseMat;
+        }
+        
+
+
     }
     
     double trace()
@@ -181,16 +329,72 @@ public:
         return Rank;
     }
 
-    void transpose(Matrix& B,int blocksize)
+    void transpose_by_block(Matrix& transposed,int blocksize)  // 比较适合大型矩阵 但是block的取值是要注意的，可以取二者的gcd
     {
+        transposed.m_mat.resize(m_cols);
+        for (auto& row:transposed.m_mat)
+        {
+            row.resize(m_rows);
+        }
+
         for (int i=0;i<m_rows;i+=blocksize)
+        {
             for (int j=0;j<m_cols;j+=blocksize)
-                for (int ii=i;ii<((i+blocksize > m_rows) ? m_rows : (i+blocksize));++ii)
-                    for (int jj=j;jj<((j+blocksize)>m_cols) ? m_cols : (j+blocksize);++jj)
-                        B.m_mat[jj][ii] = m_mat[ii][ii];
+            {
+                // 计算当前块的边界（避免越界）
+                int i_end = std::min(i + blocksize, static_cast<int>(m_rows));
+                int j_end = std::min(j + blocksize,static_cast<int>(m_cols));
+
+                for (int ii=i;i<i_end;++i)
+                {
+                    for (int jj=j;jj<j_end;++j)
+                    {
+                        transposed.m_mat[jj][ii] = m_mat[ii][jj];
+                    }
+                }
+            }
+        }
+    
     }
 
-    double getValue(int r,int c) // 得到mat(r,c)
+    void square_transose()  // 方针的转置
+    {
+        if (m_cols != m_rows)
+        {
+            throw std::invalid_argument("INVALID PARAMATERS");
+        }
+
+        for (int i=0;i<m_rows;++i)
+        {
+            for (int j=i+1;j<m_cols;++j)
+            {
+                std::swap(m_mat[i][j],m_mat[j][i]);
+            }
+        }        
+    }
+
+    double sum() const
+    {
+        double total = 0.0;
+        for (auto& row:m_mat)
+        {
+            total += std::accumulate(row.begin(),row.end(),0.0);
+        }
+        return total;
+    }
+
+    double product() const
+    {
+        double total = 1.0;
+        for(auto& row:m_mat)
+        {
+            total *= std::accumulate(row.begin(),row.end(),1.0,[](double acc,double ele){return acc * ele;});
+        }
+
+        return total;
+    }
+
+    double getValue(int r,int c) const // 得到mat(r,c)
     {
         return m_mat[r][c];
     }
@@ -218,6 +422,19 @@ public:
         }
 
         m_mat = data;
+    }
+
+    void identical_fill(double value)
+    {
+        for (auto& row:m_mat)
+        {
+            std::fill(row.begin(),row.end(),value);
+        }
+    }
+
+    void erase() // 清空矩阵
+    {
+        (*this).identical_fill(0.0);
     }
 
     double& operator()(int i,int j)
